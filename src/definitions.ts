@@ -456,6 +456,108 @@ export interface OpenWebViewOptions {
    * Test URL: https://developers.google.com/pay/api/web/guides/tutorial
    */
   enableGooglePaySupport?: boolean;
+  /**
+   * hidden: if true, creates the webview without displaying it to the user.
+   * The webview runs in the background and can be controlled programmatically.
+   * Perfect for background processing, API calls, web scraping, or automation tasks.
+   * 
+   * Can be combined with `position` to create a positioned webview that starts hidden.
+   * Use `setVisible({ visible: true })` to show it later.
+   * 
+   * When hidden is true:
+   * - The webview is created but not visible
+   * - No UI elements (toolbar, navigation) are shown
+   * - All programmatic APIs still work (executeScript, postMessage, setUrl, etc.)
+   * - Events and listeners function normally
+   * - Cookies and sessions are maintained
+   * 
+   * Note: Some options are ignored when hidden is true:
+   * - toolbarType, visibleTitle, showArrow, showReloadButton
+   * - closeModal options, buttonNearDone, shareDisclaimer
+   * - isPresentAfterPageLoad (webview is never presented)
+   * 
+   * @since 7.17.0
+   * @default false
+   * @example
+   * // Create a hidden positioned webview
+   * await InAppBrowser.openWebView({
+   *   url: 'https://example.com',
+   *   hidden: true,
+   *   position: { x: 100, y: 200, width: 300, height: 400 }
+   * });
+   * 
+   * // Show it later
+   * await InAppBrowser.setVisible({ visible: true });
+   * 
+   * // Hide it again
+   * await InAppBrowser.setVisible({ visible: false });
+   */
+  hidden?: boolean;
+  /**
+   * opacity: Sets the opacity/transparency of the webview.
+   * Value between 0.0 (fully transparent) and 1.0 (fully opaque).
+   * This allows creating overlay effects, semi-transparent widgets, or ghosted views.
+   * 
+   * Note: When using opacity < 1.0, ensure the webview content has appropriate
+   * backgrounds as transparent areas will show through to content behind.
+   * 
+   * @since 7.17.0
+   * @default 1.0
+   * @example
+   * // Semi-transparent overlay
+   * await InAppBrowser.openWebView({
+   *   url: 'https://example.com/widget',
+   *   opacity: 0.8,
+   *   position: { x: 50, y: 100, width: 300, height: 200 }
+   * });
+   */
+  opacity?: number;
+  /**
+   * position: Absolute positioning and sizing for the webview.
+   * When provided, the webview is positioned at specific coordinates rather than fullscreen.
+   * Perfect for floating widgets, picture-in-picture views, or custom layouts.
+   * 
+   * All values are in pixels (logical pixels on iOS, density-independent pixels on Android).
+   * The origin (0,0) is at the top-left corner of the screen.
+   * 
+   * Note: When position is set, the navigation bar and toolbar are automatically hidden
+   * as they don't make sense for a positioned webview.
+   * 
+   * @since 7.17.0
+   * @example
+   * // Floating widget in top-right corner
+   * await InAppBrowser.openWebView({
+   *   url: 'https://example.com/widget',
+   *   position: {
+   *     x: window.innerWidth - 320,
+   *     y: 20,
+   *     width: 300,
+   *     height: 150
+   *   },
+   *   opacity: 0.9
+   * });
+   * 
+   * // Picture-in-picture video
+   * await InAppBrowser.openWebView({
+   *   url: 'https://example.com/video',
+   *   position: {
+   *     x: 20,
+   *     y: window.innerHeight - 220,
+   *     width: 200,
+   *     height: 150
+   *   }
+   * });
+   */
+  position?: {
+    /** X coordinate from left edge of screen */
+    x: number;
+    /** Y coordinate from top edge of screen */
+    y: number;
+    /** Width of the webview */
+    width: number;
+    /** Height of the webview */
+    height: number;
+  };
 }
 
 export interface InAppBrowserPlugin {
@@ -594,6 +696,34 @@ export interface InAppBrowserPlugin {
    * @since 1.0.0
    */
   reload(): Promise<any>;
+  /**
+   * Update the position of a positioned webview.
+   * @param options.x New X coordinate
+   * @param options.y New Y coordinate
+   * @param options.width New width
+   * @param options.height New height
+   * @since 7.17.0
+   */
+  updatePosition(options: { x: number; y: number; width: number; height: number }): Promise<any>;
+  /**
+   * Update the opacity of the webview.
+   * @param options.opacity New opacity value (0.0 to 1.0)
+   * @since 7.17.0
+   */
+  updateOpacity(options: { opacity: number }): Promise<any>;
+  /**
+   * Show or hide a webview.
+   * Works with positioned and hidden webviews.
+   * @param options.visible Whether to show (true) or hide (false) the webview
+   * @since 7.17.0
+   * @example
+   * // Hide a positioned webview
+   * await InAppBrowser.setVisible({ visible: false });
+   * 
+   * // Show it again
+   * await InAppBrowser.setVisible({ visible: true });
+   */
+  setVisible(options: { visible: boolean }): Promise<any>;
 }
 
 /**

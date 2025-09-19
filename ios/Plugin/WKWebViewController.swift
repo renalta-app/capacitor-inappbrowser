@@ -234,7 +234,7 @@ open class WKWebViewController: UIViewController, WKScriptMessageHandler {
 
     open var buttonNearDoneIcon: UIImage?
 
-    fileprivate var webView: WKWebView?
+    open var webView: WKWebView?
     fileprivate var progressView: UIProgressView?
 
     fileprivate var previousNavigationBarState: (tintColor: UIColor, hidden: Bool) = (.black, false)
@@ -938,11 +938,14 @@ fileprivate extension WKWebViewController {
     }
 
     func setUpConstraints() {
-        if !(self.navigationController?.navigationBar.isHidden)! {
-            self.progressView?.frame.origin.y = CGFloat((self.navigationController?.navigationBar.frame.height)!)
-            self.navigationController?.navigationBar.addSubview(self.progressView!)
-            webView?.addObserver(self, forKeyPath: #keyPath(WKWebView.estimatedProgress), options: .new, context: nil)
-        }
+        // Safely check if navigation controller exists and navigation bar is visible
+//        if let navController = self.navigationController,
+//           let navBar = navController.navigationBar,
+//           !navBar.isHidden {
+//            self.progressView?.frame.origin.y = navBar.frame.height
+//            navBar.addSubview(self.progressView!)
+//            webView?.addObserver(self, forKeyPath: #keyPath(WKWebView.estimatedProgress), options: .new, context: nil)
+//        }
     }
 
     func addBarButtonItems() {

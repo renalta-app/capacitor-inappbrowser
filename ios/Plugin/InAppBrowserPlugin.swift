@@ -38,7 +38,10 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "show", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "close", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "executeScript", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "postMessage", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "updatePosition", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "updateOpacity", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setVisible", returnType: CAPPluginReturnPromise)
     ]
     var navigationWebViewController: UINavigationController?
     private var privacyScreen: UIImageView?
@@ -50,6 +53,13 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
     private var closeModalDescription: String?
     private var closeModalOk: String?
     private var closeModalCancel: String?
+    
+    // Hidden webview support
+    private var hiddenWebViewController: WKWebViewController?
+    private var isHiddenMode = false
+    // Positioned webview support
+    private var positionedWebView: UIView?
+    private var webViewContainer: UIView?
 
     private func setup() {
         self.isSetupDone = true
@@ -163,9 +173,19 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("URL must not be empty")
             return
         }
+        
+        // Check if this should be a hidden webview
+        let isHidden = call.getBool("hidden", false)
+        self.isHiddenMode = isHidden
+        
+        // Get opacity and position settings
+        let opacity = call.getDouble("opacity", 1.0)
+        let positionDict = call.getObject("position")
 
         var buttonNearDoneIcon: UIImage?
-        if let buttonNearDoneSettings = call.getObject("buttonNearDone") {
+        // Skip button setup for hidden mode
+        if !isHidden && call.getObject("buttonNearDone") != nil {
+            let buttonNearDoneSettings = call.getObject("buttonNearDone")!
             guard let iosSettingsRaw = buttonNearDoneSettings["ios"] else {
                 call.reject("IOS settings not found")
                 return
@@ -381,95 +401,113 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             }
 
             webViewController.source = .remote(url)
-            webViewController.leftNavigationBarItemTypes = []
+            
+            // Skip UI configuration for hidden mode
+            if !isHidden {
+                webViewController.leftNavigationBarItemTypes = []
 
-            // Configure close button based on showArrow
-            let showArrow = call.getBool("showArrow", false)
-            if showArrow {
-                // When showArrow is true, put arrow on left
-                webViewController.doneBarButtonItemPosition = .left
-                webViewController.showArrowAsClose = true
-            } else {
-                // Default X on right
-                webViewController.doneBarButtonItemPosition = toolbarType == "activity" ? .none : .right
-                webViewController.showArrowAsClose = false
-            }
-
-            // Configure navigation buttons based on toolbarType
-            if toolbarType == "activity" {
-                // Activity mode should ONLY have:
-                // 1. Close button (if not hidden by doneBarButtonItemPosition)
-                // 2. Share button (if shareSubject is provided)
-                webViewController.leftNavigationBarItemTypes = []  // Clear any left items
-                webViewController.rightNavigaionBarItemTypes = []  // Clear any right items
-
-                // Only add share button if subject is provided
-                if call.getString("shareSubject") != nil {
-                    // Add share button to right bar
-                    webViewController.rightNavigaionBarItemTypes.append(.activity)
-                    print("[DEBUG] Activity mode: Added share button, shareSubject: \(call.getString("shareSubject") ?? "nil")")
-                } else {
-                    // In activity mode, always make the share button visible by setting a default shareSubject
-                    webViewController.shareSubject = "Share"
-                    webViewController.rightNavigaionBarItemTypes.append(.activity)
-                    print("[DEBUG] Activity mode: Setting default shareSubject")
-                }
-
-                // Set done button position based on showArrow
+                // Configure close button based on showArrow
+                let showArrow = call.getBool("showArrow", false)
                 if showArrow {
+                    // When showArrow is true, put arrow on left
                     webViewController.doneBarButtonItemPosition = .left
+                    webViewController.showArrowAsClose = true
                 } else {
-                    // In activity mode, keep the done button visible even when showArrow is false
-                    webViewController.doneBarButtonItemPosition = .right
-                }
-            } else if toolbarType == "navigation" {
-                // Navigation mode puts back/forward on the left
-                webViewController.leftNavigationBarItemTypes = [.back, .forward]
-                if showReloadButton {
-                    webViewController.leftNavigationBarItemTypes.append(.reload)
+                    // Default X on right
+                    webViewController.doneBarButtonItemPosition = toolbarType == "activity" ? .none : .right
+                    webViewController.showArrowAsClose = false
                 }
 
-                // Only add share button if subject is provided
-                if call.getString("shareSubject") != nil {
-                    // Add share button to right navigation bar
-                    webViewController.rightNavigaionBarItemTypes.append(.activity)
-                }
-            } else {
-                // Other modes may have reload button
-                if showReloadButton {
-                    webViewController.leftNavigationBarItemTypes.append(.reload)
+                // Configure navigation buttons based on toolbarType
+                if toolbarType == "activity" {
+                    // Activity mode should ONLY have:
+                    // 1. Close button (if not hidden by doneBarButtonItemPosition)
+                    // 2. Share button (if shareSubject is provided)
+                    webViewController.leftNavigationBarItemTypes = []  // Clear any left items
+                    webViewController.rightNavigaionBarItemTypes = []  // Clear any right items
+
+                    // Only add share button if subject is provided
+                    if call.getString("shareSubject") != nil {
+                        // Add share button to right bar
+                        webViewController.rightNavigaionBarItemTypes.append(.activity)
+                        print("[DEBUG] Activity mode: Added share button, shareSubject: \(call.getString("shareSubject") ?? "nil")")
+                    } else {
+                        // In activity mode, always make the share button visible by setting a default shareSubject
+                        webViewController.shareSubject = "Share"
+                        webViewController.rightNavigaionBarItemTypes.append(.activity)
+                        print("[DEBUG] Activity mode: Setting default shareSubject")
+                    }
+
+                    // Set done button position based on showArrow
+                    if showArrow {
+                        webViewController.doneBarButtonItemPosition = .left
+                    } else {
+                        // In activity mode, keep the done button visible even when showArrow is false
+                        webViewController.doneBarButtonItemPosition = .right
+                    }
+                } else if toolbarType == "navigation" {
+                    // Navigation mode puts back/forward on the left
+                    webViewController.leftNavigationBarItemTypes = [.back, .forward]
+                    if showReloadButton {
+                        webViewController.leftNavigationBarItemTypes.append(.reload)
+                    }
+
+                    // Only add share button if subject is provided
+                    if call.getString("shareSubject") != nil {
+                        // Add share button to right navigation bar
+                        webViewController.rightNavigaionBarItemTypes.append(.activity)
+                    }
+                } else {
+                    // Other modes may have reload button
+                    if showReloadButton {
+                        webViewController.leftNavigationBarItemTypes.append(.reload)
+                    }
+
+                    // Only add share button if subject is provided
+                    if call.getString("shareSubject") != nil {
+                        // Add share button to right navigation bar
+                        webViewController.rightNavigaionBarItemTypes.append(.activity)
+                    }
                 }
 
-                // Only add share button if subject is provided
-                if call.getString("shareSubject") != nil {
-                    // Add share button to right navigation bar
-                    webViewController.rightNavigaionBarItemTypes.append(.activity)
+                // Set buttonNearDoneIcon if provided
+                if let buttonNearDoneIcon = buttonNearDoneIcon {
+                    webViewController.buttonNearDoneIcon = buttonNearDoneIcon
+                    print("[DEBUG] Button near done icon set: \(buttonNearDoneIcon)")
                 }
-            }
-
-            // Set buttonNearDoneIcon if provided
-            if let buttonNearDoneIcon = buttonNearDoneIcon {
-                webViewController.buttonNearDoneIcon = buttonNearDoneIcon
-                print("[DEBUG] Button near done icon set: \(buttonNearDoneIcon)")
-            }
+            }  // End of !isHidden block
 
             webViewController.capBrowserPlugin = self
-            webViewController.title = call.getString("title", "New Window")
-            // Only set shareSubject if not already set for activity mode
-            if webViewController.shareSubject == nil {
-                webViewController.shareSubject = call.getString("shareSubject")
-            }
-            webViewController.shareDisclaimer = disclaimerContent
+            
+            // Skip UI-specific configuration for hidden mode
+            if !isHidden {
+                webViewController.title = call.getString("title", "New Window")
+                // Only set shareSubject if not already set for activity mode
+                if webViewController.shareSubject == nil {
+                    webViewController.shareSubject = call.getString("shareSubject")
+                }
+                webViewController.shareDisclaimer = disclaimerContent
 
-            // Debug shareDisclaimer
-            if let disclaimer = disclaimerContent {
-                print("[DEBUG] Share disclaimer set: \(disclaimer)")
-            } else {
-                print("[DEBUG] No share disclaimer set")
-            }
+                // Debug shareDisclaimer
+                if let disclaimer = disclaimerContent {
+                    print("[DEBUG] Share disclaimer set: \(disclaimer)")
+                } else {
+                    print("[DEBUG] No share disclaimer set")
+                }
 
-            webViewController.preShowScript = call.getString("preShowScript")
-            webViewController.websiteTitleInNavigationBar = call.getBool("visibleTitle", true)
+                webViewController.preShowScript = call.getString("preShowScript")
+                webViewController.websiteTitleInNavigationBar = call.getBool("visibleTitle", true)
+                
+                // Set closeModal properties after proper initialization
+                if closeModal {
+                    webViewController.closeModal = true
+                    webViewController.closeModalTitle = self.closeModalTitle ?? closeModalTitle
+                    webViewController.closeModalDescription = self.closeModalDescription ?? closeModalDescription
+                    webViewController.closeModalOk = self.closeModalOk ?? closeModalOk
+                    webViewController.closeModalCancel = self.closeModalCancel ?? closeModalCancel
+                }
+            }
+            
             webViewController.ignoreUntrustedSSLError = ignoreUntrustedSSLError
 
             // Set Google Pay support
@@ -480,30 +518,23 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 webViewController.textZoom = textZoom
             }
 
-            // Set closeModal properties after proper initialization
-            if closeModal {
-                webViewController.closeModal = true
-                webViewController.closeModalTitle = self.closeModalTitle ?? closeModalTitle
-                webViewController.closeModalDescription = self.closeModalDescription ?? closeModalDescription
-                webViewController.closeModalOk = self.closeModalOk ?? closeModalOk
-                webViewController.closeModalCancel = self.closeModalCancel ?? closeModalCancel
-            }
+            // Only create navigation controller for non-hidden mode
+            if !isHidden {
+                self.navigationWebViewController = UINavigationController.init(rootViewController: webViewController)
+                self.navigationWebViewController?.navigationBar.isTranslucent = false
+                self.navigationWebViewController?.toolbar.isTranslucent = false
 
-            self.navigationWebViewController = UINavigationController.init(rootViewController: webViewController)
-            self.navigationWebViewController?.navigationBar.isTranslucent = false
-            self.navigationWebViewController?.toolbar.isTranslucent = false
+                // Ensure no lines or borders appear by default
+                self.navigationWebViewController?.navigationBar.setBackgroundImage(UIImage(), for: .default)
+                self.navigationWebViewController?.navigationBar.shadowImage = UIImage()
+                self.navigationWebViewController?.navigationBar.setValue(true, forKey: "hidesShadow")
+                self.navigationWebViewController?.toolbar.setShadowImage(UIImage(), forToolbarPosition: .any)
 
-            // Ensure no lines or borders appear by default
-            self.navigationWebViewController?.navigationBar.setBackgroundImage(UIImage(), for: .default)
-            self.navigationWebViewController?.navigationBar.shadowImage = UIImage()
-            self.navigationWebViewController?.navigationBar.setValue(true, forKey: "hidesShadow")
-            self.navigationWebViewController?.toolbar.setShadowImage(UIImage(), forToolbarPosition: .any)
+                // Handle web view background color
+                webViewController.view.backgroundColor = backgroundColor
 
-            // Handle web view background color
-            webViewController.view.backgroundColor = backgroundColor
-
-            // Handle toolbar color
-            if let toolbarColor = call.getString("toolbarColor"), self.isHexColorCode(toolbarColor) {
+                // Handle toolbar color
+                if let toolbarColor = call.getString("toolbarColor"), self.isHexColorCode(toolbarColor) {
                 // If specific color provided, use it
                 let color = UIColor(hexString: toolbarColor)
 
@@ -547,17 +578,17 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                 webViewController.statusBarStyle = isDarkMode ? .lightContent : .darkContent
                 webViewController.updateStatusBarStyle()
 
-            }
+                }
 
-            self.navigationWebViewController?.modalPresentationStyle = .overCurrentContext
-            self.navigationWebViewController?.modalTransitionStyle = .crossDissolve
-            if toolbarType == "blank" {
-                self.navigationWebViewController?.navigationBar.isHidden = true
-                webViewController.blankNavigationTab = true
+                self.navigationWebViewController?.modalPresentationStyle = .overCurrentContext
+                self.navigationWebViewController?.modalTransitionStyle = .crossDissolve
+                if toolbarType == "blank" {
+                    self.navigationWebViewController?.navigationBar.isHidden = true
+                    webViewController.blankNavigationTab = true
 
-                // Even with hidden navigation bar, we need to set proper status bar appearance
-                // If toolbarColor is explicitly set, use that for status bar style
-                if let toolbarColor = call.getString("toolbarColor"), self.isHexColorCode(toolbarColor) {
+                    // Even with hidden navigation bar, we need to set proper status bar appearance
+                    // If toolbarColor is explicitly set, use that for status bar style
+                    if let toolbarColor = call.getString("toolbarColor"), self.isHexColorCode(toolbarColor) {
                     let color = UIColor(hexString: toolbarColor)
                     let isDark = self.isDarkColor(color)
                     webViewController.statusBarStyle = isDark ? .lightContent : .darkContent
@@ -590,20 +621,83 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
                     }
                 }
 
+                }
+
+                // We don't use the toolbar anymore, always hide it
+                self.navigationWebViewController?.setToolbarHidden(true, animated: false)
+            }  // End of !isHidden block for navigation controller
+
+            // Handle opacity
+            if opacity < 1.0 {
+                webViewController.view.alpha = CGFloat(opacity)
+                // Make the webview background transparent to show through
+                webViewController.view.backgroundColor = UIColor.clear
+                webViewController.webView?.isOpaque = false
+                webViewController.webView?.backgroundColor = UIColor.clear
             }
-
-            // We don't use the toolbar anymore, always hide it
-            self.navigationWebViewController?.setToolbarHidden(true, animated: false)
-
-            if !self.isPresentAfterPageLoad {
+            
+            if let position = positionDict {
+                // Positioned webview mode
+                guard let x = position["x"] as? Double,
+                      let y = position["y"] as? Double,
+                      let width = position["width"] as? Double,
+                      let height = position["height"] as? Double else {
+                    call.reject("Invalid position parameters")
+                    return
+                }
+                
+                // Create a container view for the positioned webview
+                self.webViewContainer = UIView(frame: CGRect(x: x, y: y, width: width, height: height))
+                self.webViewContainer?.backgroundColor = UIColor.clear
+                
+                // Add the webview to the container (just the view, not the view controller)
+                webViewController.view.frame = CGRect(x: 0, y: 0, width: width, height: height)
+                webViewController.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                
+                // Apply opacity to container if set
+                if opacity < 1.0 {
+                    self.webViewContainer?.alpha = CGFloat(opacity)
+                }
+                
+                // If hidden is true, start with the container hidden
+                if isHidden {
+                    self.webViewContainer?.isHidden = true
+                }
+                
+                // Add the container to the main view
+                DispatchQueue.main.async {
+                    if let rootViewController = self.bridge?.viewController {
+                        // Properly add as child view controller
+                        rootViewController.addChild(webViewController)
+                        self.webViewContainer?.addSubview(webViewController.view)
+                        rootViewController.view.addSubview(self.webViewContainer!)
+                        webViewController.didMove(toParent: rootViewController)
+                        
+                        // Store reference for cleanup
+                        self.positionedWebView = self.webViewContainer
+                        self.hiddenWebViewController = webViewController
+                        self.isHiddenMode = true // Treat positioned as a variant of hidden
+                    }
+                    call.resolve()
+                }
+            } else if isHidden {
+                // For hidden mode, store the webViewController but don't present it
+                self.hiddenWebViewController = webViewController
+                // The navigation controller is not needed for hidden mode
+                self.navigationWebViewController = nil
+                call.resolve()
+            } else if !self.isPresentAfterPageLoad {
                 self.presentView(isAnimated: isAnimated)
+                call.resolve()
+            } else {
+                call.resolve()
             }
-            call.resolve()
         }
     }
 
     @objc func reload(_ call: CAPPluginCall) {
-        self.webViewController?.reload()
+        let targetWebView = self.isHiddenMode ? self.hiddenWebViewController : self.webViewController
+        targetWebView?.reload()
         call.resolve()
     }
 
@@ -618,7 +712,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        self.webViewController?.load(remote: url)
+        let targetWebView = self.isHiddenMode ? self.hiddenWebViewController : self.webViewController
+        targetWebView?.load(remote: url)
         call.resolve()
     }
 
@@ -628,7 +723,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         DispatchQueue.main.async {
-            self.webViewController?.executeScript(script: script)
+            let targetWebView = self.isHiddenMode ? self.hiddenWebViewController : self.webViewController
+            targetWebView?.executeScript(script: script)
             call.resolve()
         }
     }
@@ -643,7 +739,8 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         print("Event data: \(eventData)")
 
         DispatchQueue.main.async {
-            self.webViewController?.postMessageToJS(message: eventData)
+            let targetWebView = self.isHiddenMode ? self.hiddenWebViewController : self.webViewController
+            targetWebView?.postMessageToJS(message: eventData)
         }
         call.resolve()
     }
@@ -752,8 +849,30 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func close(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            self.navigationWebViewController?.dismiss(animated: true, completion: nil)
-            self.notifyListeners("closeEvent", data: ["url": self.webViewController?.url?.absoluteString ?? ""])
+            if self.isHiddenMode {
+                // For hidden mode, just clean up the webview
+                let url = self.hiddenWebViewController?.url?.absoluteString ?? ""
+                
+                // Clean up positioned webview if it exists
+                if let positionedView = self.positionedWebView {
+                    // Properly remove child view controller
+                    if let hiddenVC = self.hiddenWebViewController {
+                        hiddenVC.willMove(toParent: nil)
+                        hiddenVC.view.removeFromSuperview()
+                        hiddenVC.removeFromParent()
+                    }
+                    positionedView.removeFromSuperview()
+                    self.positionedWebView = nil
+                    self.webViewContainer = nil
+                }
+                
+                self.hiddenWebViewController = nil
+                self.isHiddenMode = false
+                self.notifyListeners("closeEvent", data: ["url": url])
+            } else {
+                self.navigationWebViewController?.dismiss(animated: true, completion: nil)
+                self.notifyListeners("closeEvent", data: ["url": self.webViewController?.url?.absoluteString ?? ""])
+            }
             call.resolve()
         }
     }
@@ -804,5 +923,115 @@ public class InAppBrowserPlugin: CAPPlugin, CAPBridgedPlugin {
         let blue = components[2]
         let brightness = (red * 299 + green * 587 + blue * 114) / 1000
         return brightness < 0.5
+    }
+    
+    @objc func updatePosition(_ call: CAPPluginCall) {
+        guard let x = call.getDouble("x"),
+              let y = call.getDouble("y"),
+              let width = call.getDouble("width"),
+              let height = call.getDouble("height") else {
+            call.reject("Invalid position parameters")
+            return
+        }
+        
+        DispatchQueue.main.async {
+            if let container = self.webViewContainer {
+                UIView.animate(withDuration: 0.3) {
+                    container.frame = CGRect(x: x, y: y, width: width, height: height)
+                    // Update the webview frame inside the container
+                    if let webView = self.hiddenWebViewController?.view {
+                        webView.frame = CGRect(x: 0, y: 0, width: width, height: height)
+                    }
+                }
+                call.resolve()
+            } else {
+                call.reject("No positioned webview found")
+            }
+        }
+    }
+    
+    @objc func updateOpacity(_ call: CAPPluginCall) {
+        guard let opacity = call.getDouble("opacity") else {
+            call.reject("Invalid opacity value")
+            return
+        }
+        
+        if opacity < 0.0 || opacity > 1.0 {
+            call.reject("Opacity must be between 0.0 and 1.0")
+            return
+        }
+        
+        DispatchQueue.main.async {
+            let targetView = self.webViewContainer ?? self.hiddenWebViewController?.view ?? self.webViewController?.view
+            
+            if let view = targetView {
+                UIView.animate(withDuration: 0.3) {
+                    view.alpha = CGFloat(opacity)
+                    
+                    // If making transparent, ensure backgrounds are clear
+                    if opacity < 1.0 {
+                        if let webViewController = self.hiddenWebViewController ?? self.webViewController {
+                            webViewController.view.backgroundColor = UIColor.clear
+                            webViewController.webView?.isOpaque = false
+                            webViewController.webView?.backgroundColor = UIColor.clear
+                        }
+                    }
+                }
+                call.resolve()
+            } else {
+                call.reject("No webview found")
+            }
+        }
+    }
+    
+    @objc func setVisible(_ call: CAPPluginCall) {
+        guard let visible = call.getBool("visible") else {
+            call.reject("Must provide visible parameter")
+            return
+        }
+        
+        DispatchQueue.main.async {
+            // Check for positioned webview first
+            if let container = self.webViewContainer {
+                UIView.animate(withDuration: 0.3) {
+                    container.isHidden = !visible
+                }
+                call.resolve()
+            }
+            // Check for hidden webview
+            else if let hiddenVC = self.hiddenWebViewController {
+                if visible && self.positionedWebView == nil {
+                    // If trying to show a hidden webview that wasn't positioned,
+                    // we need to add it to the view hierarchy
+                    if let rootViewController = self.bridge?.viewController {
+                        // Add as fullscreen by default when making visible
+                        rootViewController.addChild(hiddenVC)
+                        hiddenVC.view.frame = rootViewController.view.bounds
+                        hiddenVC.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                        rootViewController.view.addSubview(hiddenVC.view)
+                        hiddenVC.didMove(toParent: rootViewController)
+                        
+                        // Create a container for future visibility toggles
+                        self.webViewContainer = hiddenVC.view
+                        self.positionedWebView = hiddenVC.view
+                    }
+                } else if !visible && self.positionedWebView != nil {
+                    // Hide the positioned webview
+                    self.positionedWebView?.isHidden = true
+                }
+                call.resolve()
+            }
+            // Check for regular webview in navigation controller
+            else if let navController = self.navigationWebViewController {
+                if visible {
+                    self.bridge?.viewController?.present(navController, animated: true)
+                } else {
+                    navController.dismiss(animated: true)
+                }
+                call.resolve()
+            } else {
+                call.reject("No webview found to show/hide")
+            }
+        }
     }
 }
