@@ -35,7 +35,9 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
   async openWebView(options: OpenWebViewOptions): Promise<any> {
     console.log("openWebView", options);
     if (options.hidden) {
-      console.log("Hidden webview mode enabled - web implementation not supported");
+      console.log(
+        "Hidden webview mode enabled - web implementation not supported",
+      );
     }
     return options;
   }
@@ -64,7 +66,12 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
     return options;
   }
 
-  async updatePosition(options: { x: number; y: number; width: number; height: number }): Promise<any> {
+  async updatePosition(options: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }): Promise<any> {
     console.log("updatePosition", options);
     return;
   }
@@ -76,6 +83,11 @@ export class InAppBrowserWeb extends WebPlugin implements InAppBrowserPlugin {
 
   async setVisible(options: { visible: boolean }): Promise<any> {
     console.log("setVisible", options);
+    return;
+  }
+
+  async goBack(): Promise<any> {
+    console.log("goBack");
     return;
   }
 }

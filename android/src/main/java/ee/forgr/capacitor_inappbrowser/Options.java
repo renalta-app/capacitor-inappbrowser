@@ -181,7 +181,9 @@ public class Options {
   private boolean preventDeeplink = false;
   private List<String> authorizedAppLinks = new ArrayList<>();
   private boolean enabledSafeBottomMargin = false;
+  private boolean useTopInset = false;
   private boolean enableGooglePaySupport = false;
+  private List<String> blockedHosts = new ArrayList<>();
 
   public int getTextZoom() {
     return textZoom;
@@ -205,6 +207,14 @@ public class Options {
 
   public void setEnabledSafeMargin(boolean enabledSafeBottomMargin) {
     this.enabledSafeBottomMargin = enabledSafeBottomMargin;
+  }
+
+  public boolean getUseTopInset() {
+    return useTopInset;
+  }
+
+  public void setUseTopInset(boolean useTopInset) {
+    this.useTopInset = useTopInset;
   }
 
   public Pattern getProxyRequestsPattern() {
@@ -451,5 +461,16 @@ public class Options {
 
   public void setEnableGooglePaySupport(boolean enableGooglePaySupport) {
     this.enableGooglePaySupport = enableGooglePaySupport;
+  }
+
+  public List<String> getBlockedHosts() {
+    if (blockedHosts != null) {
+      return blockedHosts;
+    }
+    return new ArrayList<>();
+  }
+
+  public void setBlockedHosts(List<String> blockedHosts) {
+    this.blockedHosts = blockedHosts;
   }
 }

@@ -1137,10 +1137,12 @@ public class WebViewDialog extends Dialog {
       // // Apply margins based on Android version
       if (_options.getEnabledSafeMargin()) {
         mlp.bottomMargin = insets.bottom;
+      } else {
+        mlp.bottomMargin = 0;
       }
 
-      // These stay the same for all Android versions
-      mlp.topMargin = 0;
+      // Use system top inset only when explicitly enabled otherwise keep legacy 0px margin
+      mlp.topMargin = _options.getUseTopInset() ? insets.top : 0;
       mlp.leftMargin = insets.left;
       mlp.rightMargin = insets.right;
       v.setLayoutParams(mlp);
@@ -1294,22 +1296,6 @@ public class WebViewDialog extends Dialog {
                 }
               };
             }
-            // Also provide direct window methods for convenience
-            window.postMessage = function(data) {
-              try {
-                var message = typeof data === 'string' ? data : JSON.stringify(data);
-                window.AndroidInterface.postMessage(message);
-              } catch(e) {
-                console.error('Error in postMessage:', e);
-              }
-            };
-            window.close = function() {
-              try {
-                window.AndroidInterface.close();
-              } catch(e) {
-                console.error('Error in close:', e);
-              }
-            };
           }
           // Override window.print function to use our PrintInterface
           if (window.PrintInterface) {
@@ -1870,6 +1856,8 @@ public class WebViewDialog extends Dialog {
                     String currentUrl = getUrl();
                     dismiss();
                     if (_options != null && _options.getCallbacks() != null) {
+                      // Notify that confirm was clicked
+                      _options.getCallbacks().confirmBtnClicked(currentUrl);
                       _options.getCallbacks().closeEvent(currentUrl);
                     }
                   }
@@ -2201,7 +2189,9 @@ public class WebViewDialog extends Dialog {
             .setPositiveButton(
               shareDisclaimer.getString("confirmBtn", "Confirm"),
               (dialog, which) -> {
-                _options.getCallbacks().confirmBtnClicked();
+                // Notify that confirm was clicked
+                String currentUrl = getUrl();
+                _options.getCallbacks().confirmBtnClicked(currentUrl);
                 shareUrl();
               }
             )
@@ -2394,6 +2384,124 @@ public class WebViewDialog extends Dialog {
           return false;
         }
 
+        /**
+         * Checks if a host should be blocked based on the configured blocked hosts patterns
+         * @param url The URL to check
+         * @param blockedHosts The list of blocked hosts patterns
+         * @return true if the host should be blocked, false otherwise
+         */
+        private boolean shouldBlockHost(String url, List<String> blockedHosts) {
+          Uri uri = Uri.parse(url);
+          String host = uri.getHost();
+
+          if (host == null || host.isEmpty()) {
+            return false;
+          }
+
+          if (blockedHosts == null || blockedHosts.isEmpty()) {
+            return false;
+          }
+
+          String normalizedHost = host.toLowerCase();
+
+          for (String blockPattern : blockedHosts) {
+            if (
+              blockPattern != null &&
+              matchesBlockPattern(normalizedHost, blockPattern.toLowerCase())
+            ) {
+              Log.d("InAppBrowser", "Blocked host detected: " + host);
+              return true;
+            }
+          }
+
+          return false;
+        }
+
+        /**
+         * Matches a host against a blocking pattern (supports wildcards)
+         * @param host The normalized host to check
+         * @param pattern The normalized blocking pattern
+         * @return true if the host matches the pattern
+         */
+        private boolean matchesBlockPattern(String host, String pattern) {
+          if (pattern == null || pattern.isEmpty()) {
+            return false;
+          }
+
+          // Exact match - fastest check first
+          if (host.equals(pattern)) {
+            return true;
+          }
+
+          // No wildcards - already checked exact match above
+          if (!pattern.contains("*")) {
+            return false;
+          }
+
+          // Handle wildcard patterns
+          if (pattern.startsWith("*.")) {
+            return matchesWildcardDomain(host, pattern);
+          } else if (pattern.contains("*")) {
+            return matchesRegexPattern(host, pattern);
+          }
+
+          return false;
+        }
+
+        /**
+         * Handles simple subdomain wildcard patterns like "*.example.com"
+         * @param host The host to check
+         * @param pattern The wildcard pattern starting with "*."
+         * @return true if the host matches the wildcard domain
+         */
+        private boolean matchesWildcardDomain(String host, String pattern) {
+          String domain = pattern.substring(2); // Remove "*."
+
+          if (domain.isEmpty()) {
+            return false;
+          }
+
+          // Match exact domain or any subdomain
+          return host.equals(domain) || host.endsWith("." + domain);
+        }
+
+        /**
+         * Handles complex regex patterns with multiple wildcards
+         * @param host The host to check
+         * @param pattern The pattern with wildcards to convert to regex
+         * @return true if the host matches the regex pattern
+         */
+        private boolean matchesRegexPattern(String host, String pattern) {
+          try {
+            // Escape special regex characters except *
+            String escapedPattern = pattern
+              .replace("\\", "\\\\") // Must escape backslashes first
+              .replace(".", "\\.")
+              .replace("+", "\\+")
+              .replace("?", "\\?")
+              .replace("^", "\\^")
+              .replace("$", "\\$")
+              .replace("(", "\\(")
+              .replace(")", "\\)")
+              .replace("[", "\\[")
+              .replace("]", "\\]")
+              .replace("{", "\\{")
+              .replace("}", "\\}")
+              .replace("|", "\\|");
+
+            // Convert wildcards to regex
+            String regexPattern = "^" + escapedPattern.replace("*", ".*") + "$";
+
+            return Pattern.matches(regexPattern, host);
+          } catch (Exception e) {
+            Log.e(
+              "InAppBrowser",
+              "Invalid regex pattern '" + pattern + "': " + e.getMessage()
+            );
+            return false;
+          }
+        }
+
         @Override
         public boolean shouldOverrideUrlLoading(
           WebView view,
@@ -2463,6 +2571,25 @@ public class WebViewDialog extends Dialog {
               // Do nothing
             }
           }
+
+          // Check for blocked hosts (main-frame only) using the extracted function
+          List<String> blockedHosts = _options.getBlockedHosts();
+          if (
+            blockedHosts != null &&
+            !blockedHosts.isEmpty() &&
+            request.isForMainFrame()
+          ) {
+            Log.d("InAppBrowser", "Checking for blocked hosts (on main frame)");
+            if (shouldBlockHost(url, blockedHosts)) {
+              // Make sure to notify that a URL has changed even when it was blocked
+              if (_options.getCallbacks() != null) {
+                _options.getCallbacks().urlChangeEvent(url);
+              }
+              Log.d("InAppBrowser", "Navigation blocked for URL: " + url);
+              return true; // Block the navigation
+            }
+          }
+
           return false;
         }
 
@@ -2981,6 +3108,18 @@ public class WebViewDialog extends Dialog {
         }
       }
     );
+  }
+
+  /**
+   * Navigates back in the WebView history if possible
+   * @return true if navigation was successful, false otherwise
+   */
+  public boolean goBack() {
+    if (_webView != null && _webView.canGoBack()) {
+      _webView.goBack();
+      return true;
+    }
+    return false;
   }
 
   @Override

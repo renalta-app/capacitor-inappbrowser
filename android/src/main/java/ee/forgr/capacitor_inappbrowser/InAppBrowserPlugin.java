@@ -659,6 +659,11 @@ public class InAppBrowserPlugin
       Boolean.TRUE.equals(call.getBoolean("enabledSafeBottomMargin", false))
     );
 
+    // Use system top inset for WebView margin when explicitly enabled
+    options.setUseTopInset(
+      Boolean.TRUE.equals(call.getBoolean("useTopInset", false))
+    );
+
     //    options.getToolbarItemTypes().add(ToolbarItemType.RELOAD); TODO: fix this
     options.setCallbacks(
       new WebViewCallbacks() {
@@ -688,8 +693,8 @@ public class InAppBrowserPlugin
         }
 
         @Override
-        public void confirmBtnClicked() {
-          notifyListeners("confirmBtnClicked", new JSObject());
+        public void confirmBtnClicked(String url) {
+          notifyListeners("confirmBtnClicked", new JSObject().put("url", url));
         }
 
         @Override
@@ -755,6 +760,29 @@ public class InAppBrowserPlugin
       options.setAuthorizedAppLinks(authorizedLinks);
     } else {
       Log.d("InAppBrowserPlugin", "No authorized app links provided.");
+    }
+
+    JSArray blockedHostsRaw = call.getArray("blockedHosts");
+    if (blockedHostsRaw != null && blockedHostsRaw.length() > 0) {
+      List<String> blockedHosts = new ArrayList<>();
+      for (int i = 0; i < blockedHostsRaw.length(); i++) {
+        try {
+          String host = blockedHostsRaw.getString(i);
+          if (host != null && !host.trim().isEmpty()) {
+            blockedHosts.add(host);
+          }
+        } catch (Exception e) {
+          Log.w(
+            "InAppBrowserPlugin",
+            "Error reading blocked host at index " + i,
+            e
+          );
+        }
+      }
+      Log.d("InAppBrowserPlugin", "Parsed blocked hosts: " + blockedHosts);
+      options.setBlockedHosts(blockedHosts);
+    } else {
+      Log.d("InAppBrowserPlugin", "No blocked hosts provided.");
     }
 
     // Set Google Pay support option
@@ -860,6 +888,28 @@ public class InAppBrowserPlugin
                 "Error executing script: " + e.getMessage()
               );
               call.reject("Failed to execute script: " + e.getMessage());
+            }
+          }
+        }
+      );
+  }
+
+  @PluginMethod
+  public void goBack(PluginCall call) {
+    this.getActivity()
+      .runOnUiThread(
+        new Runnable() {
+          @Override
+          public void run() {
+            if (webViewDialog != null) {
+              boolean canGoBack = webViewDialog.goBack();
+              JSObject result = new JSObject();
+              result.put("canGoBack", canGoBack);
+              call.resolve(result);
+            } else {
+              JSObject result = new JSObject();
+              result.put("canGoBack", false);
+              call.resolve(result);
             }
           }
         }
@@ -1023,7 +1073,10 @@ public class InAppBrowserPlugin
         new CustomTabsCallback() {
           @Override
           public void onNavigationEvent(int navigationEvent, Bundle extras) {
-            if (navigationEvent == NAVIGATION_FINISHED) {
+            // Only fire browserPageLoaded for Custom Tabs, not for WebView
+            if (
+              navigationEvent == NAVIGATION_FINISHED && webViewDialog == null
+            ) {
               notifyListeners("browserPageLoaded", new JSObject());
             }
           }

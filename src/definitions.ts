@@ -107,6 +107,14 @@ export interface DisclaimerOptions {
   cancelBtn: string;
 }
 
+export interface CloseWebviewOptions {
+  /**
+   * Whether the webview closing is animated or not, ios only
+   * @default true
+   */
+  isAnimated?: boolean;
+}
+
 export interface OpenWebViewOptions {
   /**
    * Target URL to load.
@@ -119,8 +127,8 @@ export interface OpenWebViewOptions {
    * @since 0.1.0
    * @example
    * headers: {
-   *   'Custom-Header': 'test-value',
-   *   'Authorization': 'Bearer test-token'
+   *   "Custom-Header": "test-value",
+   *   "Authorization": "Bearer test-token"
    * }
    * Test URL: https://www.whatismybrowser.com/detect/what-http-headers-is-my-browser-sending/
    */
@@ -130,8 +138,8 @@ export interface OpenWebViewOptions {
    * @since 6.1.0
    * @example
    * credentials: {
-   *   username: 'test-user',
-   *   password: 'test-pass'
+   *   username: "test-user",
+   *   password: "test-pass"
    * }
    * Test URL: https://www.whatismybrowser.com/detect/what-http-headers-is-my-browser-sending/
    */
@@ -154,12 +162,12 @@ export interface OpenWebViewOptions {
    *
    * @example
    * // In your webpage loaded in the webview:
-   * document.getElementById('closeBtn').addEventListener('click', () => {
+   * document.getElementById("closeBtn").addEventListener("click", () => {
    *   window.mobileApp.close();
    * });
    *
    * // Send data to the app
-   * window.mobileApp.postMessage({ action: 'login', data: { user: 'test' }});
+   * window.mobileApp.postMessage({ action: "login", data: { user: "test" }});
    *
    * @since 6.10.0
    */
@@ -176,10 +184,10 @@ export interface OpenWebViewOptions {
    * @since 0.1.0
    * @example
    * shareDisclaimer: {
-   *   title: 'Disclaimer',
-   *   message: 'This is a test disclaimer',
-   *   confirmBtn: 'Accept',
-   *   cancelBtn: 'Decline'
+   *   title: "Disclaimer",
+   *   message: "This is a test disclaimer",
+   *   confirmBtn: "Accept",
+   *   cancelBtn: "Decline"
    * }
    * Test URL: https://capgo.app
    */
@@ -194,7 +202,7 @@ export interface OpenWebViewOptions {
    * @default ToolBarType.DEFAULT
    * @example
    * toolbarType: ToolBarType.ACTIVITY,
-   * title: 'Activity Toolbar Test'
+   * title: "Activity Toolbar Test"
    * Test URL: https://capgo.app
    */
   toolbarType?: ToolBarType;
@@ -208,7 +216,7 @@ export interface OpenWebViewOptions {
   /**
    * Title of the browser
    * @since 0.1.0
-   * @default 'New Window'
+   * @default "New Window"
    * @example "Camera Test"
    */
   title?: string;
@@ -272,35 +280,35 @@ export interface OpenWebViewOptions {
    * @default false
    * @example
    * closeModal: true,
-   * closeModalTitle: 'Close Window',
-   * closeModalDescription: 'Are you sure you want to close?',
-   * closeModalOk: 'Yes, close',
-   * closeModalCancel: 'No, stay'
+   * closeModalTitle: "Close Window",
+   * closeModalDescription: "Are you sure you want to close?",
+   * closeModalOk: "Yes, close",
+   * closeModalCancel: "No, stay"
    * Test URL: https://capgo.app
    */
   closeModal?: boolean;
   /**
    * CloseModalTitle: title of the confirm when user clicks on close button
    * @since 1.1.0
-   * @default 'Close'
+   * @default "Close"
    */
   closeModalTitle?: string;
   /**
    * CloseModalDescription: description of the confirm when user clicks on close button
    * @since 1.1.0
-   * @default 'Are you sure you want to close this window?'
+   * @default "Are you sure you want to close this window?"
    */
   closeModalDescription?: string;
   /**
    * CloseModalOk: text of the confirm button when user clicks on close button
    * @since 1.1.0
-   * @default 'Close'
+   * @default "Close"
    */
   closeModalOk?: string;
   /**
    * CloseModalCancel: text of the cancel button when user clicks on close button
    * @since 1.1.0
-   * @default 'Cancel'
+   * @default "Cancel"
    */
   closeModalCancel?: string;
   /**
@@ -312,9 +320,9 @@ export interface OpenWebViewOptions {
   /**
    * toolbarColor: color of the toolbar in hex format
    * @since 1.2.5
-   * @default '#ffffff'
+   * @default "#ffffff"
    * @example
-   * toolbarColor: '#FF5733'
+   * toolbarColor: "#FF5733"
    * Test URL: https://capgo.app
    */
   toolbarColor?: string;
@@ -324,7 +332,7 @@ export interface OpenWebViewOptions {
    * @since 6.10.0
    * @default calculated based on toolbarColor brightness
    * @example
-   * toolbarTextColor: '#FFFFFF'
+   * toolbarTextColor: "#FFFFFF"
    * Test URL: https://capgo.app
    */
   toolbarTextColor?: string;
@@ -375,12 +383,12 @@ export interface OpenWebViewOptions {
    * @example
    * buttonNearDone: {
    *   ios: {
-   *     iconType: 'sf-symbol',
-   *     icon: 'star.fill'
+   *     iconType: "sf-symbol",
+   *     icon: "star.fill"
    *   },
    *   android: {
-   *     iconType: 'asset',
-   *     icon: 'public/monkey.svg',
+   *     iconType: "asset",
+   *     icon: "public/monkey.svg",
    *     width: 24,
    *     height: 24
    *   }
@@ -439,6 +447,15 @@ export interface OpenWebViewOptions {
   enabledSafeBottomMargin?: boolean;
 
   /**
+   * When true, applies the system status bar inset as the WebView top margin on Android.
+   * Keeps the legacy 0px margin by default for apps that handle padding themselves.
+   * @default false
+   * @example
+   * useTopInset: true
+   */
+  useTopInset?: boolean;
+
+  /**
    * enableGooglePaySupport: if true, enables support for Google Pay popups and Payment Request API.
    * This fixes OR_BIBED_15 errors by allowing popup windows and configuring Cross-Origin-Opener-Policy.
    * Only enable this if you need Google Pay functionality as it allows popup windows.
@@ -456,26 +473,27 @@ export interface OpenWebViewOptions {
    * Test URL: https://developers.google.com/pay/api/web/guides/tutorial
    */
   enableGooglePaySupport?: boolean;
+
   /**
    * hidden: if true, creates the webview without displaying it to the user.
    * The webview runs in the background and can be controlled programmatically.
    * Perfect for background processing, API calls, web scraping, or automation tasks.
-   * 
+   *
    * Can be combined with `position` to create a positioned webview that starts hidden.
    * Use `setVisible({ visible: true })` to show it later.
-   * 
+   *
    * When hidden is true:
    * - The webview is created but not visible
    * - No UI elements (toolbar, navigation) are shown
    * - All programmatic APIs still work (executeScript, postMessage, setUrl, etc.)
    * - Events and listeners function normally
    * - Cookies and sessions are maintained
-   * 
+   *
    * Note: Some options are ignored when hidden is true:
    * - toolbarType, visibleTitle, showArrow, showReloadButton
    * - closeModal options, buttonNearDone, shareDisclaimer
    * - isPresentAfterPageLoad (webview is never presented)
-   * 
+   *
    * @since 7.17.0
    * @default false
    * @example
@@ -485,10 +503,10 @@ export interface OpenWebViewOptions {
    *   hidden: true,
    *   position: { x: 100, y: 200, width: 300, height: 400 }
    * });
-   * 
+   *
    * // Show it later
    * await InAppBrowser.setVisible({ visible: true });
-   * 
+   *
    * // Hide it again
    * await InAppBrowser.setVisible({ visible: false });
    */
@@ -497,10 +515,10 @@ export interface OpenWebViewOptions {
    * opacity: Sets the opacity/transparency of the webview.
    * Value between 0.0 (fully transparent) and 1.0 (fully opaque).
    * This allows creating overlay effects, semi-transparent widgets, or ghosted views.
-   * 
+   *
    * Note: When using opacity < 1.0, ensure the webview content has appropriate
    * backgrounds as transparent areas will show through to content behind.
-   * 
+   *
    * @since 7.17.0
    * @default 1.0
    * @example
@@ -516,13 +534,13 @@ export interface OpenWebViewOptions {
    * position: Absolute positioning and sizing for the webview.
    * When provided, the webview is positioned at specific coordinates rather than fullscreen.
    * Perfect for floating widgets, picture-in-picture views, or custom layouts.
-   * 
+   *
    * All values are in pixels (logical pixels on iOS, density-independent pixels on Android).
    * The origin (0,0) is at the top-left corner of the screen.
-   * 
+   *
    * Note: When position is set, the navigation bar and toolbar are automatically hidden
    * as they don't make sense for a positioned webview.
-   * 
+   *
    * @since 7.17.0
    * @example
    * // Floating widget in top-right corner
@@ -536,7 +554,7 @@ export interface OpenWebViewOptions {
    *   },
    *   opacity: 0.9
    * });
-   * 
+   *
    * // Picture-in-picture video
    * await InAppBrowser.openWebView({
    *   url: 'https://example.com/video',
@@ -558,9 +576,31 @@ export interface OpenWebViewOptions {
     /** Height of the webview */
     height: number;
   };
+
+  /**
+   * blockedHosts: List of host patterns that should be blocked from loading in the InAppBrowser's internal navigations.
+   * Any request inside WebView to a URL with a host matching any of these patterns will be blocked.
+   * Supports wildcard patterns like:
+   * - "*.example.com" to block all subdomains
+   * - "www.example.*" to block wildcard domain extensions
+   *
+   * @since 7.17.0
+   * @default []
+   * @example
+   * blockedHosts: ["*.tracking.com", "ads.example.com"]
+   */
+  blockedHosts?: string[];
 }
 
 export interface InAppBrowserPlugin {
+  /**
+   * Navigates back in the WebView's history if possible
+   *
+   * @since 7.21.0
+   * @returns Promise that resolves with true if navigation was possible, false otherwise
+   */
+  goBack(): Promise<{ canGoBack: boolean }>;
+
   /**
    * Open url in a new window fullscreen, on android it use chrome custom tabs, on ios it use SFSafariViewController
    *
@@ -597,14 +637,14 @@ export interface InAppBrowserPlugin {
   /**
    * Close the webview.
    */
-  close(): Promise<any>;
+  close(options?: CloseWebviewOptions): Promise<any>;
   /**
    * Open url in a new webview with toolbars, and enhanced capabilities, like camera access, file access, listen events, inject javascript, bi directional communication, etc.
    *
    * JavaScript Interface:
    * When you open a webview with this method, a JavaScript interface is automatically injected that provides:
    * - `window.mobileApp.close()`: Closes the webview from JavaScript
-   * - `window.mobileApp.postMessage({detail: {message: 'myMessage'}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
+   * - `window.mobileApp.postMessage({detail: {message: "myMessage"}})`: Sends a message from the webview to the app, detail object is the data you want to send to the webview
    *
    * @since 0.1.0
    */
@@ -648,7 +688,8 @@ export interface InAppBrowserPlugin {
     listenerFunc: UrlChangeListener,
   ): Promise<PluginListenerHandle>;
   /**
-   * Will be triggered when user clicks on confirm button when disclaimer is required
+   * Will be triggered when user clicks on confirm button when disclaimer is required,
+   * works with openWebView shareDisclaimer and closeModal
    *
    * @since 0.0.1
    */
@@ -704,7 +745,12 @@ export interface InAppBrowserPlugin {
    * @param options.height New height
    * @since 7.17.0
    */
-  updatePosition(options: { x: number; y: number; width: number; height: number }): Promise<any>;
+  updatePosition(options: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }): Promise<any>;
   /**
    * Update the opacity of the webview.
    * @param options.opacity New opacity value (0.0 to 1.0)
@@ -719,7 +765,7 @@ export interface InAppBrowserPlugin {
    * @example
    * // Hide a positioned webview
    * await InAppBrowser.setVisible({ visible: false });
-   * 
+   *
    * // Show it again
    * await InAppBrowser.setVisible({ visible: true });
    */
@@ -736,7 +782,7 @@ export interface InAppBrowserPlugin {
  * window.mobileApp.close();
  *
  * // Sending a message from webview to the native app
- * window.mobileApp.postMessage({ key: 'value' });
+ * window.mobileApp.postMessage({ key: "value" });
  *
  * @since 6.10.0
  */
@@ -750,9 +796,9 @@ export interface InAppBrowserWebViewAPIs {
      *
      * @example
      * // Add a button to close the webview
-     * const closeButton = document.createElement('button');
-     * closeButton.textContent = 'Close WebView';
-     * closeButton.addEventListener('click', () => {
+     * const closeButton = document.createElement("button");
+     * closeButton.textContent = "Close WebView";
+     * closeButton.addEventListener("click", () => {
      *   window.mobileApp.close();
      * });
      * document.body.appendChild(closeButton);
@@ -769,8 +815,8 @@ export interface InAppBrowserWebViewAPIs {
      * @example
      * // Send data to native app
      * window.mobileApp.postMessage({
-     *   action: 'dataSubmitted',
-     *   data: { username: 'test', email: 'test@example.com' }
+     *   action: "dataSubmitted",
+     *   data: { username: "test", email: "test@example.com" }
      * });
      *
      * @since 6.10.0
