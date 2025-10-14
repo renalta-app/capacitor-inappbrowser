@@ -984,10 +984,14 @@ fileprivate extension WKWebViewController {
     }
 
     func setUpConstraints() {
-        if !(self.navigationController?.navigationBar.isHidden)! {
-            self.progressView?.frame.origin.y = CGFloat((self.navigationController?.navigationBar.frame.height)!)
-            self.navigationController?.navigationBar.addSubview(self.progressView!)
+        guard let navigationBar = self.navigationController?.navigationBar,
+              !navigationBar.isHidden,
+              let progressView = self.progressView else {
+            return
         }
+
+        progressView.frame.origin.y = CGFloat(navigationBar.frame.height)
+        navigationBar.addSubview(progressView)
     }
 
     func addBarButtonItems() {
